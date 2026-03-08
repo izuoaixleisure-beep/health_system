@@ -31,9 +31,7 @@ services:
 
   # ========== 后端服务 ==========
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: health_system-backend:latest
     container_name: health_backend
     restart: always
     environment:
@@ -41,30 +39,31 @@ services:
       # 原因：容器间通信用服务名，不用 localhost（localhost 是容器自己）
       DATABASE_URL: "mysql+pymysql://root:wxsadc421@mysql:3306/health_db"
       # 生产环境建议改密钥
-      SECRET_KEY: "your-production-secret-key-change-this"
+      SECRET_KEY: "kskblzdjdwkzkblmpwzdmpnyszswpwzdsbll"
       # 允许所有来源（因为前端是 Nginx 反向代理，源可能显示为 localhost）
       ALLOW_ORIGINS: "*"
     ports:
       # 宿主机 8000 映射到容器 8000，调试用，实际通过 Nginx 访问不需要暴露
       - "8000:8000"
+    volumes:
+      # 挂载本地代码到容器，覆盖旧代码
+      - ./app:/app/app
     networks:
       - health_network
     depends_on:
       # 等 MySQL 健康检查通过后再启动
       mysql:
         condition: service_healthy
-    # 健康检查：确保后端能响应请求
+    # 健康检查：确保后端能响应请求（使用 /ping 端点，无需认证）
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   # ========== 前端服务 ==========
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+    image: health_system-frontend:latest
     container_name: health_frontend
     restart: always
     ports:

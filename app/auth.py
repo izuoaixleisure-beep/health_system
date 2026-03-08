@@ -1,5 +1,5 @@
 import os
-from passlib.context import CryptContext
+import bcrypt
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException
@@ -8,19 +8,19 @@ from .database import get_db
 from sqlalchemy.orm import Session
 from . import models
 
-# 密码加密配置
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
-)
+# 使用 bcrypt 直接处理密码（避免 passlib 的 72 字节限制问题）
 
 def hash_password(password: str):
-    # 截断密码到 72 字节（bcrypt 最大限制）
-    truncated_pwd = password[:72]
-    return pwd_context.hash(truncated_pwd)
+    # bcrypt 最大支持 72 字节，截断并转为 bytes
+    password_bytes = password[:72].encode('utf-8')
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    # 截断密码并比较
+    password_bytes = plain_password[:72].encode('utf-8')
+    hashed_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(password_bytes, hashed_bytes)
 
 # JWT 配置：从环境变量读取，生产环境必须自定义密钥
 # 原因：硬编码密钥不安全，Docker 通过环境变量注入

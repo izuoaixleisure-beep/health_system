@@ -28,6 +28,13 @@ app.include_router(user.router)
 app.include_router(resident.router)
 app.include_router(health.router)
 
+
+# 公共健康检查端点（用于 Docker 健康检查，无需认证）
+@app.get("/ping")
+def ping():
+    return {"status": "ok"}
+
+
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run("main:app", reload=True)
