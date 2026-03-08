@@ -1,0 +1,36 @@
+# Python 虚拟环境（必须在容器内重新安装，宿主的不能直接用）
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Node 依赖（前端在容器内重新 npm install）
+frontend/node_modules/
+frontend/dist/
+
+# 数据库文件（容器用 MySQL，不需要本地的）
+*.db
+*.sqlite3
+
+# IDE 和编辑器配置
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Docker 自身文件（构建时不需要）
+Dockerfile*
+docker-compose.yml
+.dockerignore
+
+# 日志和临时文件
+*.log
+logs/
+tmp/

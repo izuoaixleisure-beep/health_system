@@ -1,0 +1,88 @@
+version: '3.8'
+
+# 定义三个服务：MySQL 数据库、后端 API、前端页面
+services:
+  # ========== MySQL 数据库 ==========
+  mysql:
+    image: mysql:8.0
+    container_name: health_mysql
+    restart: always
+    environment:
+      # 设置 root 密码和数据库名
+      MYSQL_ROOT_PASSWORD: wxsadc421
+      MYSQL_DATABASE: health_db
+      # 设置时区，避免时间字段错乱
+      TZ: Asia/Shanghai
+    volumes:
+      # 数据持久化：容器删了数据还在
+      # 原因：MySQL 容器重启后数据会丢，挂载到宿主机保留
+      - mysql_data:/var/lib/mysql
+    ports:
+      # 宿主机 3306 映射到容器 3306，方便本地工具连接调试
+      - "3306:3306"
+    networks:
+      - health_network
+    # 健康检查：确保 MySQL 启动完成后再启动后端
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ========== 后端服务 ==========
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: health_backend
+    restart: always
+    environment:
+      # 数据库连接串：mysql 是服务名，Docker 会自动解析为容器 IP
+      # 原因：容器间通信用服务名，不用 localhost（localhost 是容器自己）
+      DATABASE_URL: "mysql+pymysql://root:wxsadc421@mysql:3306/health_db"
+      # 生产环境建议改密钥
+      SECRET_KEY: "your-production-secret-key-change-this"
+      # 允许所有来源（因为前端是 Nginx 反向代理，源可能显示为 localhost）
+      ALLOW_ORIGINS: "*"
+    ports:
+      # 宿主机 8000 映射到容器 8000，调试用，实际通过 Nginx 访问不需要暴露
+      - "8000:8000"
+    networks:
+      - health_network
+    depends_on:
+      # 等 MySQL 健康检查通过后再启动
+      mysql:
+        condition: service_healthy
+    # 健康检查：确保后端能响应请求
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========== 前端服务 ==========
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: health_frontend
+    restart: always
+    ports:
+      # 宿主机 80 映射到容器 80，用户通过 http://localhost 访问
+      - "80:80"
+    networks:
+      - health_network
+    depends_on:
+      # 等后端启动后再启动（虽然 Nginx 不直接依赖，但为了日志顺序）
+      backend:
+        condition: service_healthy
+
+# 定义网络：三个容器在同一个内网，可以通过服务名互访
+# 原因：Docker 默认网络隔离，自定义网络让容器间 DNS 解析服务名
+networks:
+  health_network:
+    driver: bridge
+
+# 定义数据卷：MySQL 数据存在宿主机，不随容器删除而丢失
+volumes:
+  mysql_data:

@@ -1,0 +1,27 @@
+# 使用官方 Python 3.11 轻量镜像作为基础
+# 原因：项目用 Python 开发，3.11 是当前稳定且性能较好的版本，slim 版本体积小、启动快
+FROM python:3.11-slim
+
+# 设置工作目录，所有后续操作都在 /app 下进行
+# 原因：容器需要有一个统一的工作路径，代码放这里，也方便后面挂载卷
+WORKDIR /app
+
+# 先复制 requirements.txt 并安装依赖
+# 原因：Docker 缓存机制——只要 requirements.txt 不变，这一层就会缓存，后续构建很快
+COPY app/requirements.txt .
+
+# 安装依赖，使用国内镜像源加速（阿里云的 PyPI 镜像）
+# 原因：默认国外源慢，国内服务器构建时容易超时
+RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+
+# 复制整个 app 目录到容器
+# 原因：代码是运行时必需的，现在才复制是因为前面依赖层已缓存，代码改动不会重新装依赖
+COPY app/ ./app/
+
+# 暴露 8000 端口
+# 原因：FastAPI 默认跑在 8000，告诉 Docker 这个端口要对外开放
+EXPOSE 8000
+
+# 容器启动时执行的命令
+# 原因：用 uvicorn 启动，--host 0.0.0.0 允许外部访问（默认 127.0.0.1 只有容器内能访问）
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
